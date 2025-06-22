@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Absensi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f3f4f6;
+      color: #333;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #4b0082;
+    }
+
+    #tanggal {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    #clock {
+      font-size: 36px;
+      font-weight: 600;
+      margin-bottom: 30px;
+      color: #111;
+    }
+
+    input {
+      padding: 12px;
+      width: 90%;
+      max-width: 300px;
+      font-size: 16px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    button {
+      padding: 12px 24px;
+      margin: 8px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #6a0dad;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s ease, transform 0.2s;
+    }
+
+    button:hover {
+      background-color: #4b0082;
+      transform: scale(1.03);
+    }
+
+    #loginForm, #absenPanel {
+      margin-top: 20px;
+      transition: all 0.5s ease;
+    }
+
+    #statusAbsen, #lokasi {
+      margin-top: 20px;
+      font-size: 15px;
+      color: #444;
+    }
+
+    #userName {
+      font-weight: 600;
+      color: #4b0082;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 24px; }
+      #clock { font-size: 28px; }
+      input, button { width: 90%; max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Absensi Online</h1>
+  <div id="tanggal">--</div>
+  <div id="clock">--:--:--</div>
+
+  <!-- LOGIN -->
+  <div id="loginForm">
+    <input type="text" id="nama" placeholder="Nama"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="login(event)">Login</button>
+  </div>
+
+  <!-- ABSEN -->
+  <div id="absenPanel" style="display:none;">
+    <p>Selamat datang, <span id="userName"></span>!</p>
+    <button onclick="submitAbsen('Masuk')">🟢 Absen Masuk</button>
+    <button onclick="submitAbsen('Pulang')">🔴 Absen Pulang</button>
+    <div id="statusAbsen"></div>
+    <div id="lokasi"></div>
+  </div>
+
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbxVarvNHW_swWwd-KXD8dW0R2MWt1Aw39_2K6nIvOqH3ekb6Th3fQeJxlH_5i53gzN7cg/exec"; // Ganti dengan URL Web App GAS kamu
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent =
+        now.toLocaleTimeString('id-ID', { hour12: false });
+    }
+
+    function updateTanggal() {
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      document.getElementById('tanggal').textContent = now.toLocaleDateString('id-ID', options);
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+    updateTanggal();
+
+    let loggedInUser = "";
+
+    function login(event) {
+      const nama = document.getElementById("nama").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const btn = event.target;
+
+      if (!nama || !password) {
+        alert("Isi nama dan password dengan benar.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Memproses...";
+
+      fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({
+          nama: nama,
+          password: password,
+          jenis: "LOGIN",
+          waktu: "",
+          lokasi: ""
+        }),
+      })
+      .then(res => res.text())
+      .then(response => {
+        btn.disabled = false;
+        btn.textContent = "Login";
+
+        if (response === "SUKSES") {
+          loggedInUser = nama;
+          document.getElementById("loginForm").style.display = "none";
+          document.getElementById("absenPanel").style.display = "block";
+          document.getElementById("userName").textContent = nama;
+          document.getElementById("password").value = "";
+        } else {
+          alert("Login gagal. Cek nama atau password.");
+        }
+      });
+    }
+
+    function submitAbsen(jenis) {
+      const waktu = new Date().toLocaleTimeString('id-ID', { hour12: false });
+      const password = document.getElementById("password").value;
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lokasi = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+
+          fetch(scriptURL, {
+            method: "POST",
+            body: JSON.stringify({
+              nama: loggedInUser,
+              password: password,
+              jenis: jenis,
+              waktu: waktu,
+              lokasi: lokasi
+            }),
+          })
+          .then(res => res.text())
+          .then(response => {
+            if (response === "SUKSES") {
+              document.getElementById("statusAbsen").textContent = `✅ Berhasil absen ${jenis} pada ${waktu}`;
+              document.getElementById("lokasi").textContent = `📍 Lokasi: ${lokasi}`;
+            } else {
+              document.getElementById("statusAbsen").textContent = "❌ Gagal absen. Silakan coba lagi.";
+            }
+          });
+
+        }, err => {
+          document.getElementById("statusAbsen").textContent = "❌ Tidak bisa mendeteksi lokasi.";
+        });
+      } else {
+        alert("Browser tidak mendukung deteksi lokasi.");
+      }
+    }
+  </script>
+
+</body>
+</html>
